@@ -1,0 +1,50 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.26'
+
+      - name: Reject committed local SDK replaces
+        run: |
+          if grep -Eq '^replace github.com/Silo-Server/silo-plugin-sdk => /' go.mod; then
+            echo "go.mod contains a machine-local silo-plugin-sdk replace."
+            exit 1
+          fi
+
+      - name: Run tests
+        env:
+          GOWORK: off
+        run: go test ./...
+
+      - name: Vet
+        env:
+          GOWORK: off
+        run: go vet ./...
+
+      - name: Build
+        env:
+          GOWORK: off
+        run: go build ./...
+
+      - name: gofmt
+        run: |
+          out="$(gofmt -l .)"
+          if [ -n "$out" ]; then
+            echo "$out"
+            exit 1
+          fi

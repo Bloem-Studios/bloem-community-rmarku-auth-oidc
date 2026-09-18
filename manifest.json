@@ -1,0 +1,128 @@
+{
+  "plugin_id": "community.silo-plugin-auth-oidc",
+  "version": "0.1.0",
+  "checksum": "__CHECKSUM__",
+  "silo_api_version": "v1",
+  "presentation": {
+    "display_name": "OIDC Auth Provider",
+    "summary": "Sign in to Silo with any OpenID Connect identity provider.",
+    "description_markdown": "A generic, vendor-agnostic OpenID Connect auth provider for Silo. Works against any identity provider that publishes `.well-known/openid-configuration` \u2014 Authelia, Authentik, Keycloak, Zitadel, Pocket ID, Auth0, and others. Reference example for the `auth_provider.v1` capability's OAuth flow.",
+    "setup_markdown": "Set **Issuer URL**, **Client ID**, and **Client Secret** (if your IdP requires one) from your OpenID Connect provider's application registration, then enable **OpenID Connect** as a login method.",
+    "source_url": "https://github.com/rmarku/silo-plugin-auth-oidc",
+    "publisher_name": "rmarku",
+    "support_url": "https://github.com/rmarku/silo-plugin-auth-oidc/issues",
+    "changelog_url": "https://github.com/rmarku/silo-plugin-auth-oidc/releases",
+    "publisher_url": "https://github.com/rmarku",
+    "license_spdx": "AGPL-3.0-or-later"
+  },
+  "supported_platforms": [
+    {
+      "os": "linux",
+      "arch": "amd64"
+    },
+    {
+      "os": "linux",
+      "arch": "arm64"
+    },
+    {
+      "os": "darwin",
+      "arch": "arm64"
+    }
+  ],
+  "capabilities": [
+    {
+      "type": "auth_provider.v1",
+      "id": "oidc",
+      "display_name": "OpenID Connect",
+      "description": "Generic OIDC authorization-code login backed by any provider's discovery document.",
+      "auth_modes": [
+        "oauth2"
+      ]
+    }
+  ],
+  "global_config_schema": [
+    {
+      "key": "oidc",
+      "title": "OpenID Connect settings",
+      "description": "Connection details for the identity provider this installation authenticates against.",
+      "required": true,
+      "json_schema": "{\"type\":\"object\",\"properties\":{\"issuer_url\":{\"type\":\"string\",\"format\":\"uri\"},\"client_id\":{\"type\":\"string\"},\"client_secret\":{\"type\":\"string\"},\"scopes\":{\"type\":\"string\"},\"username_claim\":{\"type\":\"string\"},\"email_claim\":{\"type\":\"string\"},\"display_name_claim\":{\"type\":\"string\"},\"groups_claim\":{\"type\":\"string\"},\"require_pkce\":{\"type\":\"boolean\"},\"allowed_groups\":{\"type\":\"string\"}},\"required\":[\"issuer_url\",\"client_id\"],\"additionalProperties\":false}",
+      "admin_form": {
+        "fields": [
+          {
+            "key": "issuer_url",
+            "label": "Issuer URL",
+            "description": "Base URL of the identity provider. Discovery is fetched from {issuer_url}/.well-known/openid-configuration.",
+            "control": "ADMIN_FORM_CONTROL_TEXT",
+            "placeholder": "https://auth.example.com",
+            "required": true
+          },
+          {
+            "key": "client_id",
+            "label": "Client ID",
+            "control": "ADMIN_FORM_CONTROL_TEXT",
+            "required": true
+          },
+          {
+            "key": "client_secret",
+            "label": "Client Secret",
+            "description": "Leave blank for a public client.",
+            "control": "ADMIN_FORM_CONTROL_PASSWORD",
+            "secret": true
+          },
+          {
+            "key": "scopes",
+            "label": "Scopes",
+            "description": "Space-separated OAuth scopes. \"openid\" is always included.",
+            "control": "ADMIN_FORM_CONTROL_TEXT",
+            "placeholder": "openid profile email",
+            "default_value": "openid profile email"
+          },
+          {
+            "key": "username_claim",
+            "label": "Username claim",
+            "description": "ID token / userinfo claim used as the Silo username on auto-provisioning.",
+            "control": "ADMIN_FORM_CONTROL_TEXT",
+            "placeholder": "preferred_username",
+            "default_value": "preferred_username"
+          },
+          {
+            "key": "email_claim",
+            "label": "Email claim",
+            "control": "ADMIN_FORM_CONTROL_TEXT",
+            "placeholder": "email",
+            "default_value": "email"
+          },
+          {
+            "key": "display_name_claim",
+            "label": "Display name claim",
+            "control": "ADMIN_FORM_CONTROL_TEXT",
+            "placeholder": "name",
+            "default_value": "name"
+          },
+          {
+            "key": "groups_claim",
+            "label": "Groups claim",
+            "control": "ADMIN_FORM_CONTROL_TEXT",
+            "placeholder": "groups",
+            "default_value": "groups"
+          },
+          {
+            "key": "require_pkce",
+            "label": "Require PKCE",
+            "description": "Use PKCE (S256) on the authorization-code flow. Disable only for providers that reject it.",
+            "control": "ADMIN_FORM_CONTROL_SWITCH",
+            "default_value": true
+          },
+          {
+            "key": "allowed_groups",
+            "label": "Allowed groups",
+            "description": "Comma-separated list of groups. Restricts login to users whose groups claim intersects this list. Empty allows all authenticated users.",
+            "control": "ADMIN_FORM_CONTROL_TEXT",
+            "placeholder": "admins, media-users"
+          }
+        ]
+      }
+    }
+  ]
+}

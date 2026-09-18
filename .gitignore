@@ -1,0 +1,7 @@
+plugin
+silo-plugin-auth-oidc
+dist/
+*.exe
+go.work
+go.work.sum
+.DS_Store
