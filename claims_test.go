@@ -23,7 +23,7 @@ func TestMapClaims_UsernamePrecedenceAndFields(t *testing.T) {
 		"at_hash":            "should-be-stripped",
 	}
 
-	resp, err := mapClaims(cfg, claims)
+	resp, _, err := mapClaims(cfg, claims)
 	if err != nil {
 		t.Fatalf("mapClaims: %v", err)
 	}
@@ -58,7 +58,7 @@ func TestMapClaims_UsernameFallsBackToSubject(t *testing.T) {
 	cfg := testConfig()
 	claims := map[string]any{"sub": "abc123"}
 
-	resp, err := mapClaims(cfg, claims)
+	resp, _, err := mapClaims(cfg, claims)
 	if err != nil {
 		t.Fatalf("mapClaims: %v", err)
 	}
@@ -69,7 +69,7 @@ func TestMapClaims_UsernameFallsBackToSubject(t *testing.T) {
 
 func TestMapClaims_MissingSubjectErrors(t *testing.T) {
 	cfg := testConfig()
-	if _, err := mapClaims(cfg, map[string]any{"preferred_username": "jdoe"}); err == nil {
+	if _, _, err := mapClaims(cfg, map[string]any{"preferred_username": "jdoe"}); err == nil {
 		t.Fatalf("expected error for missing sub claim")
 	}
 }
@@ -80,7 +80,7 @@ func TestMapClaims_GroupsAsList(t *testing.T) {
 		"sub":    "abc123",
 		"groups": []any{"admins", "media-users", "admins"},
 	}
-	resp, err := mapClaims(cfg, claims)
+	resp, _, err := mapClaims(cfg, claims)
 	if err != nil {
 		t.Fatalf("mapClaims: %v", err)
 	}
@@ -101,7 +101,7 @@ func TestMapClaims_GroupsAsList(t *testing.T) {
 func TestMapClaims_GroupsAsScalarString(t *testing.T) {
 	cfg := testConfig()
 	claims := map[string]any{"sub": "abc123", "groups": "admins"}
-	resp, err := mapClaims(cfg, claims)
+	resp, _, err := mapClaims(cfg, claims)
 	if err != nil {
 		t.Fatalf("mapClaims: %v", err)
 	}
@@ -114,7 +114,7 @@ func TestMapClaims_GroupsAsScalarString(t *testing.T) {
 
 func TestMapClaims_GroupsAbsent(t *testing.T) {
 	cfg := testConfig()
-	resp, err := mapClaims(cfg, map[string]any{"sub": "abc123"})
+	resp, _, err := mapClaims(cfg, map[string]any{"sub": "abc123"})
 	if err != nil {
 		t.Fatalf("mapClaims: %v", err)
 	}

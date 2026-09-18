@@ -7,9 +7,7 @@ package main
 
 import (
 	"context"
-	"crypto/sha256"
 	_ "embed"
-	"encoding/hex"
 	"fmt"
 	"os"
 
@@ -55,26 +53,10 @@ func (s *runtimeServer) Configure(_ context.Context, req *pluginv1.ConfigureRequ
 }
 
 func loadManifest() (*pluginv1.PluginManifest, error) {
-	manifest, err := publicmanifest.Load(manifestJSON)
+	manifest, err := publicmanifest.LoadWithChecksum(manifestJSON, version)
 	if err != nil {
 		return nil, fmt.Errorf("load embedded manifest: %w", err)
 	}
-
-	if version != "" {
-		manifest.Version = version
-	}
-
-	executablePath, err := os.Executable()
-	if err != nil {
-		return nil, fmt.Errorf("resolve executable path: %w", err)
-	}
-	binaryData, err := os.ReadFile(executablePath)
-	if err != nil {
-		return nil, fmt.Errorf("read executable %q: %w", executablePath, err)
-	}
-	checksum := sha256.Sum256(binaryData)
-	manifest.Checksum = hex.EncodeToString(checksum[:])
-
 	return manifest, nil
 }
 

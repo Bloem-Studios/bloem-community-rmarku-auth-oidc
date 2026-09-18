@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 
 	pluginv1 "github.com/Silo-Server/silo-plugin-sdk/pkg/pluginproto/silo/plugin/v1"
@@ -52,6 +53,30 @@ func (c config) isConfigured() bool {
 // request and resolves it against defaultConfig. entries with no "oidc" key
 // (e.g. a fresh install) yield defaultConfig with issuer_url/client_id empty,
 // which isConfigured reports as not ready.
+// simpleStringFields are the admin_form fields that resolve to a single
+// config string, optionally post-processed (e.g. issuer_url's trailing
+// slash). Fields needing other types (scopes, require_pkce, allowed_groups)
+// are handled separately in parseConfig.
+func simpleStringFields(cfg *config) []struct {
+	key       string
+	dest      *string
+	transform func(string) string
+} {
+	return []struct {
+		key       string
+		dest      *string
+		transform func(string) string
+	}{
+		{"issuer_url", &cfg.issuerURL, func(v string) string { return strings.TrimRight(v, "/") }},
+		{"client_id", &cfg.clientID, nil},
+		{"client_secret", &cfg.clientSecret, nil},
+		{"username_claim", &cfg.usernameClaim, nil},
+		{"email_claim", &cfg.emailClaim, nil},
+		{"display_name_claim", &cfg.displayClaim, nil},
+		{"groups_claim", &cfg.groupsClaim, nil},
+	}
+}
+
 func parseConfig(entries []*pluginv1.ConfigEntry) (config, error) {
 	cfg := defaultConfig()
 
@@ -61,46 +86,26 @@ func parseConfig(entries []*pluginv1.ConfigEntry) (config, error) {
 		}
 		values := entry.GetValue().AsMap()
 
-		if v, err := stringField(values, "issuer_url"); err != nil {
-			return config{}, err
-		} else if v != "" {
-			cfg.issuerURL = strings.TrimRight(strings.TrimSpace(v), "/")
+		for _, f := range simpleStringFields(&cfg) {
+			v, err := stringField(values, f.key)
+			if err != nil {
+				return config{}, err
+			}
+			if v == "" {
+				continue
+			}
+			if f.transform != nil {
+				v = f.transform(v)
+			}
+			*f.dest = v
 		}
-		if v, err := stringField(values, "client_id"); err != nil {
-			return config{}, err
-		} else if v != "" {
-			cfg.clientID = v
-		}
-		if v, err := stringField(values, "client_secret"); err != nil {
-			return config{}, err
-		} else if v != "" {
-			cfg.clientSecret = v
-		}
+
 		if v, err := stringField(values, "scopes"); err != nil {
 			return config{}, err
 		} else if v != "" {
-			cfg.scopes = splitScopes(v)
+			cfg.scopes = strings.Fields(v)
 		}
-		if v, err := stringField(values, "username_claim"); err != nil {
-			return config{}, err
-		} else if v != "" {
-			cfg.usernameClaim = v
-		}
-		if v, err := stringField(values, "email_claim"); err != nil {
-			return config{}, err
-		} else if v != "" {
-			cfg.emailClaim = v
-		}
-		if v, err := stringField(values, "display_name_claim"); err != nil {
-			return config{}, err
-		} else if v != "" {
-			cfg.displayClaim = v
-		}
-		if v, err := stringField(values, "groups_claim"); err != nil {
-			return config{}, err
-		} else if v != "" {
-			cfg.groupsClaim = v
-		}
+
 		if raw, ok := values["require_pkce"]; ok {
 			b, ok := raw.(bool)
 			if !ok {
@@ -108,6 +113,7 @@ func parseConfig(entries []*pluginv1.ConfigEntry) (config, error) {
 			}
 			cfg.requirePKCE = b
 		}
+
 		v, err := stringField(values, "allowed_groups")
 		if err != nil {
 			return config{}, fmt.Errorf("oidc config: allowed_groups: %w", err)
@@ -148,22 +154,9 @@ func splitAllowedGroups(raw string) []string {
 	return out
 }
 
-func splitScopes(raw string) []string {
-	fields := strings.Fields(raw)
-	out := make([]string, 0, len(fields))
-	for _, f := range fields {
-		if f != "" {
-			out = append(out, f)
-		}
-	}
-	return out
-}
-
 func ensureScope(scopes []string, want string) []string {
-	for _, s := range scopes {
-		if s == want {
-			return scopes
-		}
+	if slices.Contains(scopes, want) {
+		return scopes
 	}
 	return append([]string{want}, scopes...)
 }

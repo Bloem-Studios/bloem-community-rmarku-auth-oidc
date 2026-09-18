@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"maps"
 
 	"google.golang.org/protobuf/types/known/structpb"
 
@@ -10,7 +11,8 @@ import (
 
 // protocolClaims are OIDC/OAuth mechanics rather than user identity; they are
 // dropped from the AuthenticateResponse claims struct so the host only sees
-// identity data.
+// identity data. "sub" is deliberately not listed here: it is kept as the
+// canonical subject claim rather than being stripped and re-added.
 var protocolClaims = map[string]struct{}{
 	"nonce":   {},
 	"at_hash": {},
@@ -20,7 +22,6 @@ var protocolClaims = map[string]struct{}{
 	"exp":     {},
 	"iat":     {},
 	"nbf":     {},
-	"sub":     {},
 }
 
 // mapClaims turns decoded ID token (and, when available, userinfo) claims
@@ -31,10 +32,10 @@ var protocolClaims = map[string]struct{}{
 // name and groups are surfaced via claims for callers that want them, and
 // groups are put there specifically so a future host-side role mapper
 // (silo-server#554) can consume them.
-func mapClaims(cfg config, claims map[string]any) (*pluginv1.AuthenticateResponse, error) {
+func mapClaims(cfg config, claims map[string]any) (response *pluginv1.AuthenticateResponse, groups []string, err error) {
 	subject := stringClaim(claims, "sub")
 	if subject == "" {
-		return nil, fmt.Errorf("oidc: id token has no sub claim")
+		return nil, nil, fmt.Errorf("oidc: id token has no sub claim")
 	}
 
 	username := stringClaim(claims, cfg.usernameClaim)
@@ -43,7 +44,7 @@ func mapClaims(cfg config, claims map[string]any) (*pluginv1.AuthenticateRespons
 	}
 	email := stringClaim(claims, cfg.emailClaim)
 	displayName := stringClaim(claims, cfg.displayClaim)
-	groups := groupsClaim(claims, cfg.groupsClaim)
+	groups = groupsClaim(claims, cfg.groupsClaim)
 
 	normalized := map[string]any{
 		"username": username,
@@ -62,11 +63,10 @@ func mapClaims(cfg config, claims map[string]any) (*pluginv1.AuthenticateRespons
 	for key := range protocolClaims {
 		delete(merged, key)
 	}
-	merged["sub"] = subject
 
 	claimsStruct, err := structpb.NewStruct(merged)
 	if err != nil {
-		return nil, fmt.Errorf("oidc: encode claims: %w", err)
+		return nil, nil, fmt.Errorf("oidc: encode claims: %w", err)
 	}
 
 	return &pluginv1.AuthenticateResponse{
@@ -74,19 +74,14 @@ func mapClaims(cfg config, claims map[string]any) (*pluginv1.AuthenticateRespons
 		DisplayName:     username,
 		Email:           email,
 		Claims:          claimsStruct,
-	}, nil
+	}, groups, nil
 }
 
 // mergeClaims returns a copy of base with every key from extra that base
 // does not already define. base's values take precedence.
 func mergeClaims(base, extra map[string]any) map[string]any {
-	out := make(map[string]any, len(base)+len(extra))
-	for k, v := range extra {
-		out[k] = v
-	}
-	for k, v := range base {
-		out[k] = v
-	}
+	out := maps.Clone(extra)
+	maps.Copy(out, base)
 	return out
 }
 

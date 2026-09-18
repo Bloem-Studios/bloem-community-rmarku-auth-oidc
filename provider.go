@@ -2,8 +2,6 @@ package main
 
 import (
 	"context"
-	"crypto/rand"
-	"encoding/base64"
 	"fmt"
 	"net/http"
 	"sync"
@@ -118,10 +116,7 @@ func (p *provider) InitAuthorize(ctx context.Context, req *pluginv1.InitAuthoriz
 		return nil, status.Errorf(codes.Unavailable, "oidc discovery failed: %v", err)
 	}
 
-	nonce, err := randomToken()
-	if err != nil {
-		return nil, fmt.Errorf("oidc: generate nonce: %w", err)
-	}
+	nonce := oauth2.GenerateVerifier()
 
 	oauthCfg := p.oauthConfig(op, cfg, req.GetRedirectUri())
 	authOpts := []oauth2.AuthCodeOption{oidc.Nonce(nonce)}
@@ -196,21 +191,7 @@ func (p *provider) ExchangeCode(ctx context.Context, req *pluginv1.ExchangeCodeR
 	}
 	p.mergeUserInfo(ctx, op, oauthCfg, token, idToken.Subject, claims)
 
-	response, err := mapClaims(cfg, claims)
-	if err != nil {
-		return nil, err
-	}
-	if err := p.enforceAllowedGroups(cfg, response); err != nil {
-		return nil, err
-	}
-
-	if token.RefreshToken != "" {
-		p.mu.Lock()
-		p.refreshTokens[response.GetExternalSubject()] = token.RefreshToken
-		p.mu.Unlock()
-	}
-
-	return response, nil
+	return p.finishAuth(cfg, claims, token)
 }
 
 // mergeUserInfo augments claims with the provider's userinfo endpoint,
@@ -249,24 +230,29 @@ func (p *provider) mergeUserInfo(
 	}
 }
 
-func (p *provider) enforceAllowedGroups(cfg config, response *pluginv1.AuthenticateResponse) error {
-	if len(cfg.allowedGroups) == 0 {
-		return nil
-	}
-	var groups []string
-	if raw, ok := response.GetClaims().AsMap()["groups"]; ok {
-		if items, ok := raw.([]any); ok {
-			for _, item := range items {
-				if s, ok := item.(string); ok {
-					groups = append(groups, s)
-				}
-			}
-		}
+// finishAuth maps decoded claims to the host's identity shape, enforces
+// allowed_groups, and caches the refresh token (if any) for RefreshSession.
+// Shared by ExchangeCode and RefreshSession, which differ only in how they
+// obtain the token and claims.
+func (p *provider) finishAuth(cfg config, claims map[string]any, token *oauth2.Token) (*pluginv1.AuthenticateResponse, error) {
+	response, groups, err := mapClaims(cfg, claims)
+	if err != nil {
+		return nil, err
 	}
 	if !groupAllowed(cfg.allowedGroups, groups) {
-		return status.Error(codes.PermissionDenied, "oidc: user's groups are not in allowed_groups")
+		return nil, status.Error(codes.PermissionDenied, "oidc: user's groups are not in allowed_groups")
 	}
-	return nil
+	p.storeRefreshToken(response.GetExternalSubject(), token.RefreshToken)
+	return response, nil
+}
+
+func (p *provider) storeRefreshToken(subject, refreshToken string) {
+	if refreshToken == "" {
+		return
+	}
+	p.mu.Lock()
+	p.refreshTokens[subject] = refreshToken
+	p.mu.Unlock()
 }
 
 // RefreshSession uses the token endpoint's refresh_token grant. It only
@@ -316,27 +302,5 @@ func (p *provider) RefreshSession(ctx context.Context, req *pluginv1.RefreshSess
 		return nil, fmt.Errorf("oidc: decode id_token claims: %w", err)
 	}
 
-	response, err := mapClaims(cfg, claims)
-	if err != nil {
-		return nil, err
-	}
-	if err := p.enforceAllowedGroups(cfg, response); err != nil {
-		return nil, err
-	}
-
-	if token.RefreshToken != "" {
-		p.mu.Lock()
-		p.refreshTokens[response.GetExternalSubject()] = token.RefreshToken
-		p.mu.Unlock()
-	}
-
-	return response, nil
-}
-
-func randomToken() (string, error) {
-	buf := make([]byte, 32)
-	if _, err := rand.Read(buf); err != nil {
-		return "", err
-	}
-	return base64.RawURLEncoding.EncodeToString(buf), nil
+	return p.finishAuth(cfg, claims, token)
 }
