@@ -1,3 +1,12 @@
+## Bloem community build
+
+This is Bloem's community build of [rmarku/silo-plugin-auth-oidc](https://github.com/rmarku/silo-plugin-auth-oidc) by **rmarku**
+(contributors: rmarku). It is ported to the Bloem plugin SDK and listed in the
+Bloem community plugin catalog. All credit for the plugin goes to its author; please
+report plugin behavior issues upstream. See [NOTICE](NOTICE) for provenance.
+
+---
+
 # OIDC Auth Provider Plugin for Silo
 
 A generic, vendor-agnostic `auth_provider.v1` plugin for

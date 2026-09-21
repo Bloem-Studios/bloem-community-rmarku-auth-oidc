@@ -1,0 +1,17 @@
+Bloem community build of silo-plugin-auth-oidc
+
+Original author: rmarku (https://github.com/rmarku/silo-plugin-auth-oidc)
+Contributors: rmarku
+Forked from commit 6f1440cc7fbdfb929ef37f71279e2fa8aa74b939. The full upstream history is preserved in this repository.
+
+All credit for this plugin's design and implementation goes to its author and
+contributors. Upstream license: AGPL-3.0.
+Upstream copyright notices are unchanged.
+
+Bloem changes: the Bloem plugin SDK v0.16.1 (based on the Silo plugin SDK v0.16.1)
+instead of the Silo SDK, this fork's Go module path, catalog presentation that keeps
+the author as publisher and links the original repository, and removal of workflows
+that publish to Silo plugin catalogs. Plugin and capability identifiers and behavior
+are unchanged.
+
+Bloem and Bloem Studios are not affiliated with or endorsed by the author.
